@@ -1,0 +1,82 @@
+/*----------------------------------*/
+/* Integer type definitions by Kaje */
+/*----------------------------------*/
+//V1 
+//	byte_uint32_t
+//	byte_uint16_t
+//	dsfc
+
+#ifndef _KINTEGER_H_
+#define _KINTEGER_H_
+
+	typedef unsigned char	byte;
+	typedef unsigned char	uint8_t;
+	typedef int				int16_t;
+	typedef unsigned int	uint16_t;
+	typedef long			int32_t;
+	typedef unsigned long	uint32_t;
+
+
+	typedef union { 
+			uint16_t i; 
+	      	uint8_t b[2];
+			struct{
+				uint8_t l;
+				uint8_t h;
+			};
+	} byte_uint16_t;
+	typedef union { 
+			uint32_t i; 
+	      	uint8_t b[4];
+			struct{
+				uint8_t ll;
+				uint8_t lh;
+				uint8_t hl;
+				uint8_t hh;
+			};
+			struct{
+				byte_uint16_t l;
+				byte_uint16_t h;
+			};
+	} byte_uint32_t;
+
+	//untested yet
+	#define revert_uint32(num)	( (((uint32_t)num>>24)&0xff) | (((uint32_t)num>>8)&0xff00)| (((uint32_t)num<<8)&0xff0000) | (((uint32_t)num<<24)&0xff000000) )
+	#define revert_uint16(num)	( (((uint16_t)num>>8)&0x00ff)| (((uint16_t)num<<8)&0xff00) )
+
+	//#define kcMSBfirst(c1,c2,c3,c4)	((c1<<4)|(c2<<2)|(c3<<1)|(c4<<0))
+	//#define kcLSBfirst(c1,c2,c3,c4)	((c1<<0)|(c2<<1)|(c3<<2)|(c4<<3))
+	//#define kcToUint32(c1,c2,c3,c4)	kcLSBfirst(c1,c2,c3,c4)
+	//#define kcToUint16(c1,c2)	kcLSBfirst(c1,c2,0,0)
+	//#define kc_KTST	'K','T','S','T'
+
+
+/*-------------------------------------------*/
+/* Integer type definitions for FatFs module */
+/*-------------------------------------------*/
+
+	/* These types must be 16-bit, 32-bit or larger integer */
+	typedef int				INT;
+	typedef unsigned int	UINT;
+
+	/* These types must be 8-bit integer */
+	typedef signed char		CHAR;
+	typedef unsigned char	UCHAR;
+	typedef unsigned char	BYTE;
+
+	/* These types must be 16-bit integer */
+	typedef short			SHORT;
+	typedef unsigned short	USHORT;
+	typedef unsigned short	WORD;
+	typedef unsigned short	WCHAR;
+
+	/* These types must be 32-bit integer */
+	typedef long			LONG;
+	typedef unsigned long	ULONG;
+	typedef unsigned long	DWORD;
+
+	/* Boolean type */
+	typedef enum { FALSE = 0, TRUE } BOOL;
+
+
+#endif

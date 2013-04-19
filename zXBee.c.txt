@@ -1,0 +1,341 @@
+//Kaje V4.1
+
+#include "XBee.h"
+
+#define XBEE_EnablePrintf		1	// for reporting unexpected events
+#define XBEE_RECIEVE_XBeeHandleByte		1	//Low level		(~322 bytes)
+#define XBEE_RECIEVE_XBeeApiRecieved	1	//Medium level
+#define XBEE_RECIEVE_KPacketRecieved	1	//High level	(Medium+High=~396 bytes)
+
+
+#define XBEE_SEND_XBeeSendApiPacket		1	//Low level		(~76 bytes)
+#define XBEE_SEND_XBeeSendPacket16		1	//Medium level	(~98 bytes)
+#define XBEE_SEND_XBeeSetParameter		1	//High level	(~60 bytes)
+#define XBEE_SEND_XBeeSendAtCommand		0	//High level	(~36 bytes)
+#define XBEE_SEND_XBeeSendTest			1	//High level	(~34 bytes)
+
+
+//#define DISABLE_XBEE
+
+#ifdef DISABLE_XBEE
+
+	XBeeApiMsg_t XBeeMsg[XBeeRxMsgCount]={{{0},0,0,0}};
+	XBeeApiMsg_t* pXRecMsg=0;
+	inline void WriteUint32ToXBeeMessage(uint32_t value, uint8_t * p){;};
+	inline uint32_t ReadUint32FromXBeeMessage(uint8_t * p){return 0;};
+	void XBeeHandleByte(XBeeDataType cIn){;}
+	void XBeeApiRecieved(){;}
+	void XBeeSendApiPacket(int len, XBeeDataType *pData){;}
+	XBeeDataType XBeeSetParameter(uint16_t command,uint32_t value){return 0;}
+	void XBeeSendTest(void){;};
+	XBeeDataType XBeeSendPacket16(uint16_t addr, XBeeDataType *pData, int DataLen, char DisableAck, char BroadcastPanID, char NoResponse){return 0;};
+	#warning XBEE disabled
+#else
+	// Recieve Message
+		XBeeApiMsg_t XBeeMsg[XBeeMsgCount]={{0}};
+		XBeeApiMsg_t *RxMsgLBound=&XBeeMsg[0];
+		XBeeApiMsg_t *RxMsgUBound=&XBeeMsg[XBeeMsgCount-1];
+		XBeeApiMsg_t* pXRecMsg=&XBeeMsg[0];
+		
+
+		/*unsigned char XBeeState=0;
+		uint16_t XBeeMsgSize;
+		XBeeDataType XBeeMsgData[200];
+		XBeeDataType XBeeCRC;
+		byte_uint16_t FromAddr;
+		byte_uint32_t kCommand;
+		byte_uint32_t VarID;
+		int  XBeeMsgDataCount;*/
+	///Recieve Message
+
+	// Send Message
+		//XBeeMsgData_t XBeeSendMsg[XBeeTxMsgCount]={{0}};
+		//XBeeDataType XBeeSendData[200];
+	///Send Message
+
+	//Debuging: Printf
+	//	Every Printf may (and will) cause loss of XBee-Bytes => new errors 
+	//	So be careful!
+#if XBEE_EnablePrintf
+	#define Print_Yes(...)	printf(__VA_ARGS__)
+	#define Print_No(...)
+#else
+	#define Print_Yes(...)
+	#define Print_No(...)
+#endif
+	//
+	//	LowLevel (XBeeHandleByte)
+	#define PrintfRxBytes(...)		Print_No(__VA_ARGS__)	// print every byte (not recommended)(activate errors too)
+
+	#define PrintfTimeout(...)		Print_Yes(__VA_ARGS__)	// not recommended: causes the next message to be corrupted
+	#define PrintfWrongBytes(...)	Print_Yes(__VA_ARGS__)	// not recommended: causes the next message to be corrupted
+	#define PrintfSizeError(...)	Print_Yes(__VA_ARGS__)	// very,very rare error.
+	#define PrintfCrcError(...)		Print_Yes(__VA_ARGS__)	//
+	#define PrintfStatusError(...)	Print_Yes(__VA_ARGS__)	// 
+	#define PrintfRxReserveError(...)	Print_Yes(__VA_ARGS__)	// 
+	
+	#define PrintfGetUnusedFail(...)		Print_Yes(__VA_ARGS__)	// not recommended: causes the next message to be corrupted
+
+	// Medium Level (XBeeApiRecieved)
+	#define PrintfTxStatus(...) 	Print_No(__VA_ARGS__)	//
+	#define PrintfCmdResponse(...)	Print_No(__VA_ARGS__)	//
+	#define PrintfRx16(...)			Print_Yes(__VA_ARGS__)	//
+	#define PrintfKCMD(...)			Print_No(__VA_ARGS__)	//
+	#define PrintfUnknownKCMD(...)	Print_No(__VA_ARGS__)	//
+	#define PrintfUnknownApiID(...)	Print_No(__VA_ARGS__)	//
+	// High Level (KPacketRecieved)
+	#define PrintfKMSG(...) Print_No(__VA_ARGS__)	// print the kMessage Command of every Packet (first 4 Bytes as string)
+	#define PrintfDMX(...) 	Print_No(__VA_ARGS__)	// print Dmx-Value-Packets in detail
+	#define PrintfKGET(...) Print_No(__VA_ARGS__)	// print "KGET" and what Value was requested
+	#define PrintfkGET(...) Print_No(__VA_ARGS__)	//
+	#define PrintfxGET(...) Print_No(__VA_ARGS__)	//
+	#define PrintfKSET(...) Print_No(__VA_ARGS__)	//
+	#define PrintfKTST(...) Print_No(__VA_ARGS__)	//
+	#define PrintfKPNG(...) Print_No(__VA_ARGS__)	//
+
+int8_t GetUnusedXBeeMsg(void){
+int8_t ret;
+	for (ret=0;ret<XBeeMsgCount;ret++){
+		if(XBeeMsg[ret].Status==XBeeStateUnused){
+			XBeeMsg[ret].Status=XBeeStateReserved;
+			return(ret);
+		}
+	}
+	PrintfGetUnusedFail("PrintfGetUnused failed\n");
+	return(-1);
+}
+int8_t GetRxXBeeMsg(void){
+int8_t ret;
+	for (ret=0;ret<XBeeMsgCount;ret++){
+		if(XBeeMsg[(int) ret].Status==XBeeStateValid){
+			return(ret);
+		}
+	}
+	return(-1);
+}
+
+#if XBEE_RECIEVE_XBeeHandleByte
+	#define StateOnError	XBeeStateReserved
+	void XBeeHandleByte(XBeeDataType cIn){
+	int8_t NewRxMsg;
+		/*static uint32_t xuptime=0;
+		if(pXRecMsg->Status){// TODO: Timeout
+			if(uptime>(xuptime+2)){
+				//PrintfTimeout("Xtimeout\n");
+				pXRecMsg->Status=0;
+			}
+		}
+		xuptime = uptime;*/
+		//if(pXRecMsg->Status>0){
+			switch(pXRecMsg->Status){
+			case XBeeStateUnused: //Start-Token
+			case XBeeStateReserved:
+				if(cIn==XBeeMsgStart){
+					//pXRecMsg->MsgLen=0;
+					pXRecMsg->pWrite=&pXRecMsg->Api.ApiIdentifier;
+					pXRecMsg->Status=XBeeStateSizeMsb;
+					PrintfRxBytes("XToken\n");
+				}else{
+					PrintfWrongBytes("Xerr %c\n",cIn);
+				}
+				break;
+			case XBeeStateSizeMsb://Size MSB
+				pXRecMsg->MsgLen.h=cIn;
+				pXRecMsg->Status=XBeeStateSizeLsb;
+				break;
+			case XBeeStateSizeLsb://Size LSB
+				pXRecMsg->MsgLen.l = cIn;
+				if((pXRecMsg->MsgLen.i <=0)|(pXRecMsg->MsgLen.i >= sizeof(pXRecMsg->Api.b))){
+					//error
+					PrintfSizeError("Xerr Size:%i\n",pXRecMsg->MsgLen.i);
+					pXRecMsg->Status=StateOnError;
+				}else{
+					// everythings ok
+					pXRecMsg->pCRC=&pXRecMsg->Api.b[pXRecMsg->MsgLen.i];	//Set CRC-Pointer
+					*(pXRecMsg->pCRC)=0;									//CRC=0;
+					PrintfRxBytes("XSize:%i (cIn=%i)\n",pXRecMsg->MsgLen.i,cIn);
+					pXRecMsg->Status=XBeeStateData;							//next state
+				}
+				break;
+			case XBeeStateData://Data
+				*(pXRecMsg->pCRC)+=cIn;					//update CRC
+
+				PrintfRxBytes("%02x",cIn);
+				//PrintfRxBytes("%c",cIn);
+				if(pXRecMsg->pWrite < (pXRecMsg->pCRC)){	//if still data
+					*(pXRecMsg->pWrite++)=cIn;				//	save byte
+				}else{										//if CRC-Byte (data complete)
+					PrintfRxBytes("\n");
+					
+					if(*(pXRecMsg->pCRC)==0xFF){
+						PrintfRxBytes("X[PacketOK]\n");
+						pXRecMsg->Status=XBeeStateValid;
+						NewRxMsg=GetUnusedXBeeMsg();
+						if(NewRxMsg<0){
+							PrintfRxReserveError("RxReserveError\n");
+						}else{
+							pXRecMsg=&XBeeMsg[NewRxMsg];
+						}
+					}else{
+						PrintfCrcError("Xerr[CRC] %i!=%i (%i)\n",*(pXRecMsg->pCRC),cIn,pXRecMsg->MsgLen.i);	//Checksum-Error
+						pXRecMsg->Status=StateOnError;
+					}
+				}
+				break;
+			default:
+				NewRxMsg=GetUnusedXBeeMsg();
+				if(NewRxMsg<0){
+					PrintfStatusError("X[StatusErr]=%i\n",pXRecMsg->Status);
+				}else{
+					PrintfStatusError("X[StatusFind]=%i\n",NewRxMsg);
+					pXRecMsg=&XBeeMsg[NewRxMsg];
+					XBeeHandleByte(cIn);
+				}
+				break;
+			}
+		//}
+	}
+
+#endif //XBEE_RECIEVE_XBeeHandleByte
+#if XBEE_RECIEVE_XBeeApiRecieved
+
+	void XBeeApiRecieved(XBeeApiMsg_t * XMsg){
+		//XBeeApiMsg_t * XMsg = &XBeeMsg[0];
+		//int i;
+		//byte_uint32_t val;
+		//byte_uint32_t kCommand;
+		//byte_uint32_t VarID;
+		//byte_uint16_t DmxBase;
+		//uint32_t * xVarID =(uint32_t*) &XMsg->Data.RX16.Data[4];
+		//int iTmp;
+		int iFor;
+			switch(XMsg->Api.ApiIdentifier){
+			/*case xApiTransmitStatus:
+				//untested
+				PrintfTxStatus("XRsp:TX[%i] %i\n",XMsg->Data.byte[1], XMsg->Data.byte[2]);
+				break;
+			case xApiAtCommandResponse:
+				//untested
+				val.b[3]= XMsg->Data.byte[5];
+				val.b[2]= XMsg->Data.byte[6];
+				val.b[1]= XMsg->Data.byte[7];
+				val.b[0]= XMsg->Data.byte[8];
+				PrintfCmdResponse("XRsp:AtCmd %lu\n",val.i);
+				break;*/
+			case xApiRecievePacket16:
+				PrintfRx16("XRsp:RX[");
+				for(iFor=0;iFor<2;iFor++)
+					PrintfRx16("%c",XMsg->Api.RX16.RxData[iFor]);
+				PrintfRx16("]\n");
+				//printf("TEST\n");
+				XMsg->Addr16.h=XMsg->Api.RX16.Source_H; // ySourceAddr MSB
+				XMsg->Addr16.l=XMsg->Api.RX16.Source_L; // ySourceAddr LSB
+				//XBeeMsgData[3]; // RSSI
+				//XBeeMsgData[4]; // Options
+				XBeeRX(XMsg);
+				break;
+			/*default:
+				PrintfUnknownApiID("XRsp:Api unknown:");
+				for(iFor=0;iFor < XMsg->MsgLen;iFor++){
+					PrintfUnknownApiID("%c", XMsg->Data.byte[iFor]);
+				}
+				PrintfUnknownApiID("\n");
+				break;*/
+			}
+		}
+#endif	//XBEE_RECIEVE_XBeeApiRecieved
+#if XBEE_SEND_XBeeSendApiPacket
+	#define GetFrameID() 'x'
+	#define Byte3(xxx) ((xxx >>(8*3)) & 0xFF)
+	#define Byte2(xxx) ((xxx >>(8*2)) & 0xFF)
+	#define Byte1(xxx) ((xxx >>(8*1)) & 0xFF)
+	#define Byte0(xxx) ((xxx >>(8*0)) & 0xFF)
+	void XBeeSendApiPacket(int len, XBeeDataType *pData){
+	unsigned char mCRC;
+		XBeeSend(XBeeMsgStart);
+		XBeeSend(Byte1(len));
+		XBeeSend(Byte0(len));
+		mCRC=0xFF;
+		while (len--){
+			mCRC-=*pData;
+			XBeeSend(*pData);
+			pData++;
+		}
+		XBeeSend(mCRC);
+	}
+#endif //XBEE_SEND_XBeeSendApiPacket
+#if  XBEE_SEND_XBeeSendAtCommand
+	XBeeDataType XBeeSendAtCommand(uint16_t command){
+	XBeeDataType FrameID;
+		FrameID = GetFrameID();
+		XBeeSendData[0]=xApiAtCommand;
+		XBeeSendData[1]=FrameID;
+		XBeeSendData[2]=Bit1(command);
+		XBeeSendData[3]=Bit0(command);
+		XBeeSendApiPacket(4,XBeeSendData);
+		return FrameID;
+	}
+#endif //XBEE_SEND_XBeeSendAtCommand
+#if  XBEE_SEND_XBeeSetParameter
+	XBeeDataType XBeeSetParameter(uint16_t command,uint32_t value){
+	XBeeDataType ThisApi[8];
+		ThisApi[0]=xApiAtCommand;
+		ThisApi[1]=GetFrameID();
+		ThisApi[2]=Byte1(command);
+		ThisApi[3]=Byte0(command);
+		ThisApi[4]=Byte3(value);
+		ThisApi[5]=Byte2(value);
+		ThisApi[6]=Byte1(value);
+		ThisApi[7]=Byte0(value);
+		XBeeSendApiPacket(8,ThisApi);
+		return ThisApi[1];
+	}
+#endif //XBEE_SEND_XBeeSetParameter
+#if XBEE_SEND_XBeeSendPacket16
+	XBeeDataType XBeeSendPacket16(uint16_t addr, XBeeDataType *pData, int DataLen, char DisableAck, char BroadcastPanID, char NoResponse){
+	XBeeApiMsg_t* pTxMsg;
+	XBeeDataType FrameID;
+	XBeeDataType options;
+	int p;
+		p=GetUnusedXBeeMsg();
+		if(p<0){
+			PrintfRxReserveError("RxSendGetUnusedError\n");
+			return 0;
+		}else{
+			pTxMsg=&XBeeMsg[p];
+		}
+		if(DataLen>100){
+			DataLen=100;
+		}
+		options=0;
+		if(DisableAck)
+			options |= (1<<1);
+		if(BroadcastPanID)
+			options |= (1<<3);
+		if(NoResponse){
+			FrameID=0;
+		}else{
+			FrameID=GetFrameID();
+		}
+		pTxMsg->Api.b[0]=xApiTransmitRequest16;
+		pTxMsg->Api.b[1]=	FrameID;
+		pTxMsg->Api.b[2]=	Byte1(addr);
+		pTxMsg->Api.b[3]=	Byte0(addr);
+		pTxMsg->Api.b[4]=	options;
+		for(p=0;p<DataLen;p++){
+			pTxMsg->Api.b[5+p]= *pData;
+			pData++;
+		}
+		XBeeSendApiPacket(DataLen+5,&pTxMsg->Api.b[0]);
+		pTxMsg->Status=XBeeStateUnused;
+		return FrameID;
+	}
+#endif //XBEE_SEND_XBeeSendPacket16
+#if  XBEE_SEND_XBeeSendTest
+	void XBeeSendTest(void){
+		uint8_t sTest[]="KTST";
+		//XBeeSendPacket16(0xFFFF, &sTest[0], 4, 0 , 0, 0);	//Response
+		XBeeSendPacket16(0xFFFF, sTest, 4, 1, 0, 1);	//NoResponse
+	}
+#endif //XBEE_SEND_XBeeSendTest
+#endif

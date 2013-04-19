@@ -1,0 +1,197 @@
+//Kaje V4.1
+
+// INCLUDES+XBeeSend
+// TYPEDEFS
+// CONSTANTS
+// Variables
+// Functions
+
+#ifndef _XBEE_H_
+#define _XBEE_H_
+//-----------------------------
+//----- INCLUDES+XBeeSend -----
+//-----------------------------
+	//#include "main.h"
+	#if 1 // AVR
+		#include "kinteger.h"
+		#include "XBeeConstants.h"
+		#include <avr/io.h>
+		#include "XMegaUSART.h"
+	#elif 0// LPC
+		#include "LPC214x.h"
+		#include "kinteger.h"
+		#include "XBeeConstants.h"
+		//#include "Files.h"
+		//#include "hardware.h"
+		#include "Files.h"
+		#include "hardware.h"
+		#include "main.h"
+		#include "uart.h"
+	#else
+		#error "What device???"
+	#endif
+	//#include "main.h"
+	//#define XBeeSend(c) Usart_SendByte(&UsartXBee,c)
+	/*#define uint8_t		unsigned char
+	#define uint16_t	unsigned short
+	#define uint32_t	unsigned long
+	#include "Files.h"
+	#include "hardware.h"
+	#include "main.h"
+	#define XBeeSend(c) UART1WriteChar(c)*/
+
+	void XBeeSend(uint8_t c);
+//-----------------------------
+//-----      TYPEDEFS     -----
+//-----------------------------
+
+	enum XBeeMessageStatus{
+		XBeeStateUnused=0,	
+		XBeeStateReserved,//=waiting for StartToken
+		XBeeStateSizeMsb,
+		XBeeStateSizeLsb,
+		XBeeStateData,
+		//XBeeStateCRC,
+		XBeeStateValid,		//please now handle
+		XBeeStateToBeSent,
+		XBeeStateSending
+	};
+
+	typedef union {
+		uint8_t b[110];
+		uint8_t ApiIdentifier;
+		struct{
+			uint8_t ApiIdentifier;
+			uint8_t Source_H;
+			uint8_t Source_L;
+			uint8_t RSSI;
+			uint8_t Options;
+			uint8_t RxData[100];
+		}RX16;
+		struct{
+			uint8_t ApiIdentifier;
+			uint8_t FrameID;
+			uint8_t Destination_H;
+			uint8_t Destination_L;
+			uint8_t Options;
+			uint8_t TxData[100];
+		}TX16;
+		struct{
+			uint8_t ApiIdentifier;
+			uint8_t Status;
+		}ModemStatus;
+	} XBeeApi_t;
+
+	typedef struct {
+		volatile int Status;
+		byte_uint16_t MsgLen;
+		byte_uint16_t Addr16;
+		//uint16_t WritenBytes;
+		uint8_t * pWrite;
+		uint8_t * pCRC;
+	    XBeeApi_t Api;
+
+	}XBeeApiMsg_t;
+
+	#define Rx16HeaderLen	5
+	#define Tx16HeaderLen	5
+
+	//-----------------------------
+	//-----     VARIABLES     -----
+	//-----------------------------
+
+	#define XBeeMsgCount	3
+
+	extern XBeeApiMsg_t XBeeMsg[XBeeMsgCount];
+	extern XBeeApiMsg_t *RxMsgLBound;
+	extern XBeeApiMsg_t *RxMsgUBound;
+	extern XBeeApiMsg_t* pXRecMsg;
+
+
+	#define XBeeDataType			uint8_t
+	#define XBeeSendBufferSize		200
+
+
+	#define kcMSBfirst(c1,c2,c3,c4)	(((uint32_t)c1<<(4*8))|((uint32_t)c2<<(2*8))|((uint32_t)c3<<(1*8))|((uint32_t)c4<<(0*8)))
+	#define kcLSBfirst(c1,c2,c3,c4)	(((uint32_t)c1<<(0*8))|((uint32_t)c2<<(1*8))|((uint32_t)c3<<(2*8))|((uint32_t)c4<<(3*8)))
+	#define kcToUint32(c1,c2,c3,c4)	kcLSBfirst(c1,c2,c3,c4)
+	#define kcToUint16(c1,c2)	kcLSBfirst(c1,c2,0,0)
+	//-----------------------------
+	//-----     FUNCTIONS     -----
+	//-----------------------------
+//Individuell
+	int myKSET(unsigned long ValueID,unsigned char * p,int length);	// (-1)=fail, 1=Erfolg
+	int myKGET(unsigned long ValueID,unsigned char * p);	// (-1)=fail; sonst Anzahl der geschriebenen Bytes
+	void myKDMX_val(int channel, unsigned char value);
+	void myKDMX_done(void);
+	void myxGET(void);
+	void mykGET(void);
+	void myKBoot(void);
+	void XBeeRX(XBeeApiMsg_t* XMsg);
+///Individuell
+
+
+// RecieveMessage (READ ONLY RECOMMENDED)
+	/*extern XBeeDataType XBeeMsgData[200];
+	extern XBeeDataType XBeeCRC;
+	extern byte_uint16_t FromAddr;
+	extern byte_uint32_t kCommand;
+	extern byte_uint32_t VarID;*/
+// RecieveMessage
+
+
+ 	void XBeeHandleByte(XBeeDataType cIn);
+	void XBeeApiRecieved(XBeeApiMsg_t * XMsg);
+	XBeeDataType XBeeSendPacket16(uint16_t addr, XBeeDataType *pData, int DataLen, char DisableAck, char BroadcastPanID, char NoResponse);
+
+	XBeeDataType XBeeSetParameter(uint16_t command,uint32_t value);
+	XBeeDataType XBeeSendAtCommand(uint16_t command);
+	void XBeeSendApiPacket(int len, XBeeDataType *pData);
+	void XBeeSendApiPacket2(XBeeApiMsg_t* msg);
+	void XBeeSendTest(void);
+
+
+	void Rx16Handle(XBeeApiMsg_t * XMsg);
+
+
+	int8_t GetUnusedXBeeMsg(void);
+	int8_t GetRxXBeeMsg(void);
+
+// Tools
+	//static inline void WriteUint32ToXBeeMessage(uint32_t value, uint8_t * p);
+	//static inline uint32_t ReadUint32FromXBeeMessage(uint8_t * p);
+	static inline void WriteUint32ToXBeeMessage(uint32_t value, uint8_t * p){
+	byte_uint32_t val;
+		val.i=value;
+		*(p++)=val.b[3];
+		*(p++)=val.b[2];
+		*(p++)=val.b[1];
+		*(p++)=val.b[0];
+	}
+	static inline uint32_t ReadUint32FromXBeeMessage(uint8_t * p){
+	byte_uint32_t val;
+		val.b[3]=*(p+0);
+		val.b[2]=*(p+1);
+		val.b[1]=*(p+2);
+		val.b[0]=*(p+3);
+		return(val.i);
+	}
+	static inline uint8_t UnHexChar(uint8_t p){
+		if(('0'<=p)|(p<='9')){
+			return (p-'0'+0x0);
+		}else if(('A'<=p)|(p<='F')){
+			return (p-'A'+0xA);
+		}else{
+			return 0;
+		}
+	}
+	static inline uint8_t ReadUint8_HEX_FromXBeeMessage(uint8_t * p){
+		uint8_t val;
+		val=0;
+		val|=(UnHexChar(*(p+0))<<4*1);
+		val|=(UnHexChar(*(p+1))<<4*0);
+		return(val);
+	}
+///Tools
+
+#endif

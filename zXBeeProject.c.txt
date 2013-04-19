@@ -1,0 +1,224 @@
+#include "XBee_old.h"
+//#include "project.h"
+//#include "GetValues.h"
+//#include "LED.h"
+//#include "Test.h"
+//#include "XMegaUSART.h"
+
+#define NAME_len 20
+
+#define ApiHeader	5
+#define KbooOffset	0
+#define FrameOffset	4
+#define CmdOffset	5
+#define AddrOffset	6
+#define DataOffset	10
+// ---------------------------------
+// --------   INDIVIDUELL   --------
+// ---------------------------------
+#define Ptr2Uint32(p)	(*((uint32_t*)(p)))
+#define Ptr2Uint16(p)	(*((uint16_t*)(p)))
+#define Ptr2Uint8(p)	(*((uint8_t*)(p)))
+/*
+void XBeeSend(uint8_t c){
+	Usart_SendByte(&UsartXBee,c);
+}	
+
+//unsigned long GetVersion(void){
+//unsigned long __attribute__ ((section (".test"))) GetVersion(void){
+//	return 0x12345678;
+//}
+//uint32_t GetVersion2(void){
+//		return (Boot_Version());
+//}
+void AnswerRX(XBeeApiMsg_t* XMsg, int kDataLen){
+	if(XMsg->Api.TX16.TxData[2]=='K'){
+		XMsg->Api.TX16.TxData[2]='k';
+	}
+	XMsg->Api.ApiIdentifier=xApiTransmitRequest16;
+	XMsg->Api.TX16.Destination_L=XMsg->Api.RX16.Source_L;
+	XMsg->Api.TX16.Destination_H=XMsg->Api.RX16.Source_H;
+	XMsg->Api.TX16.FrameID=0;
+	XMsg->Api.TX16.Options=DisableAck_bm;
+	XMsg->MsgLen.i=7+kDataLen;
+	XBeeSendApiPacket(XMsg->MsgLen.i, XMsg->Api.b);
+	XMsg->Status=XBeeStateUnused;
+}
+void XBeeRX(XBeeApiMsg_t* XMsg){
+	int iFor;
+	uint32_t xkCmd=kcToUint32(XMsg->Api.RX16.RxData[2],XMsg->Api.RX16.RxData[3],XMsg->Api.RX16.RxData[4],XMsg->Api.RX16.RxData[5]);
+	uint32_t kValID=kcToUint32(XMsg->Api.RX16.RxData[6],XMsg->Api.RX16.RxData[7],XMsg->Api.RX16.RxData[8],XMsg->Api.RX16.RxData[9]);
+	uint8_t * kData = &XMsg->Api.RX16.RxData[2];
+	uint32_t value;
+	int channel;
+	uint16_t kDataLen = (XMsg->MsgLen.i) - (Rx16HeaderLen+2+4+4);//RxHeaderLen+kFrame+"KGET"+"NAME"
+	//printf("RX %02X%02X %c%c%c%c\n",XMsg->Api.RX16.RxData[0] ,XMsg->Api.RX16.RxData[1]  ,XMsg->Api.RX16.RxData[2] ,XMsg->Api.RX16.RxData[3] ,XMsg->Api.RX16.RxData[4] ,XMsg->Api.RX16.RxData[5]    );
+	//printf("%.4s [%i][%i][%i]\n",&XMsg->Api.TX16.TxData[2] ,XBeeMsg[0].Status,XBeeMsg[1].Status,XBeeMsg[2].Status);
+	if (XMsg->Api.RX16.RxData[2] == 'K'){
+		switch(xkCmd){
+		case kcToUint32('K','P','N','G'):
+			AnswerRX(XMsg,4);
+			//printf("ping\n");
+			return;
+		case kcToUint32('K','R','E','S'):
+			CCP = CCP_IOREG_gc;
+			RST.CTRL = RST_SWRST_bm;
+		case kcToUint32('K','T','S','T'):
+			printf("testing [%i][%i][%i]\n",XBeeMsg[0].Status,XBeeMsg[1].Status,XBeeMsg[2].Status);
+			value=ReadUint8_HEX_FromXBeeMessage(&kData[4]);
+			WriteUint32ToXBeeMessage(((value<<8*3)|(LedTabelle(value))),&kData[4]);
+			//WriteUint32ToXBeeMessage(LedTabelle(channel),&kData[4]);
+			//WriteUint32ToXBeeMessage(BootVer(),&kData[4]);
+			//WriteUint32ToXBeeMessage(GetVersion2(),&kData[4]);
+			//WriteUint32ToXBeeMessage(0x12345678,&kData[4]);
+			AnswerRX(XMsg,8);
+			printf("tested [%i][%i][%i]\n",XBeeMsg[0].Status,XBeeMsg[1].Status,XBeeMsg[2].Status);
+			//Test5();
+			break;
+		case kcToUint32('K','D','M','X'):
+			channel= ((kData[4])<<(8*1));
+			channel= ((kData[5])<<(8*0));
+			//printf("KDMX %i\n",channel);
+			channel = channel-DmxBaseAdr;
+			for(iFor=6;iFor<(XMsg->MsgLen.i) - (Rx16HeaderLen+2);iFor++){
+				if((0<=channel)&(channel<sizeof(DmxVal))){
+					DmxVal[channel]=kData[iFor];
+					//printf("%i=%i\n",channel,kData[iFor]);
+				}else{
+					//printf("%i=X\n",channel);
+				}
+				channel++;
+			}
+
+
+			switch(MySettings.Mode){
+			case 0:
+				CalculateRGB();
+				break;
+			case 1:
+				DMX_PacketsRecieved++;
+				break;
+			}
+			XMsg->Status=XBeeStateUnused;
+			break;
+		case kcToUint32('K','G','E','T'):
+			switch(kValID){
+			case kcToUint32('N','A','M','E'):
+				for(iFor=0;iFor<=NAME_len;iFor++){
+					if(MySettings.Name[iFor]==0){
+						break;
+					}else{
+						kData[iFor+8]=MySettings.Name[iFor];
+					}
+				}
+				AnswerRX(XMsg,8+iFor);
+				return;
+			case kcToUint32('H','W','_','_'):
+				WriteUint32ToXBeeMessage(MySettings.HWID,&kData[8]);
+				WriteUint32ToXBeeMessage(MySettings.HWV, &kData[12]);
+				AnswerRX(XMsg,8+8);
+				return;
+			case kcToUint32('H','W','I','D'):
+				WriteUint32ToXBeeMessage(MySettings.HWID,&kData[8]);;
+				AnswerRX(XMsg,8+4);
+				return;
+			case kcToUint32('H','W','V','_'):
+				WriteUint32ToXBeeMessage(MySettings.HWV, &kData[8]);;
+				AnswerRX(XMsg,8+4);
+				return;
+			case kcToUint32('S','W','_','_'):
+				WriteUint32ToXBeeMessage(SWID,&kData[8]);
+				WriteUint32ToXBeeMessage(SWV, &kData[12]);
+				AnswerRX(XMsg,8+8);
+				return;
+			case kcToUint32('S','W','I','D'):
+				WriteUint32ToXBeeMessage(SWID,&kData[8]);;
+				AnswerRX(XMsg,8+4);
+				return;
+			case kcToUint32('S','W','V','_'):
+				WriteUint32ToXBeeMessage(SWV, &kData[8]);;
+				AnswerRX(XMsg,8+4);
+				return;
+			case kcToUint32('D','A','d','r'):
+				WriteUint32ToXBeeMessage(MySettings.DmxAddr,&kData[8]);
+				AnswerRX(XMsg,8+4);
+				return;
+			case kcToUint32('M','o','d','e'):
+				WriteUint32ToXBeeMessage(MySettings.Mode,&kData[8]);
+				AnswerRX(XMsg,8+4);
+				return;
+			case kcToUint32('V','m','i','n'):
+				WriteUint32ToXBeeMessage(MySettings.Vmin,&kData[8]);
+				AnswerRX(XMsg,8+4);
+				return;
+			case kcToUint32('V','C','C','_'):
+				WriteUint32ToXBeeMessage(Read_mV(),&kData[8]);
+				AnswerRX(XMsg,8+4);
+				return;
+			case kcToUint32('F','V','C','C'):
+				WriteUint32ToXBeeMessage(Read_mV(),&kData[8]);
+				AnswerRX(XMsg,8+4);
+				return;
+			default:
+				XMsg->Api.TX16.TxData[2]='x';
+				AnswerRX(XMsg,8);
+			}
+			break;
+		case kcToUint32('K','S','E','T'):
+			value = ReadUint32FromXBeeMessage( &kData[8]);
+			switch(kValID){
+			case kcToUint32('H','W','I','D'):
+				MySettings.HWID=value;
+				WriteMySettings();
+				AnswerRX(XMsg,8);
+				return;
+			case kcToUint32('H','W','V','_'):
+				MySettings.HWV=value;
+				WriteMySettings();
+				AnswerRX(XMsg,8);
+				return;
+			case kcToUint32('D','A','d','r'):
+				MySettings.DmxAddr=value;
+				WriteMySettings();
+				AnswerRX(XMsg,8);
+				return;
+			case kcToUint32('M','o','d','e'):
+				MySettings.Mode=value;
+				WriteMySettings();
+				AnswerRX(XMsg,8);
+				return;
+			case kcToUint32('V','m','i','n'):
+				MySettings.Vmin=value;
+				WriteMySettings();
+				AnswerRX(XMsg,8);
+				return;
+			case kcToUint32('N','A','M','E'):
+				if(kDataLen>NAME_len){
+					kDataLen=NAME_len;
+				}
+				iFor=0;
+				//printf("KSET_NAME:%i,%i\n",kDataLen,XMsg->MsgLen.i);
+				while (kDataLen--){
+					MySettings.Name[iFor]=kData[8+iFor];
+					iFor++;
+				}
+				MySettings.Name[iFor]=0;
+				WriteMySettings();
+				AnswerRX(XMsg,8);
+				return;
+			default:
+				XMsg->Api.TX16.TxData[2]='x';
+				AnswerRX(XMsg,8);
+			}
+			break;
+		default:
+			XMsg->Api.TX16.TxData[2]='x';
+			AnswerRX(XMsg,4);
+		}
+	}else{
+		XMsg->Api.TX16.TxData[2]='x';
+		AnswerRX(XMsg,4);
+	}
+}
+
+*/
