@@ -6,42 +6,19 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>629</width>
-    <height>497</height>
+    <width>878</width>
+    <height>563</height>
    </rect>
   </property>
   <property name="windowTitle">
    <string>MainWindow</string>
   </property>
   <widget class="QWidget" name="centralwidget">
-   <widget class="QListWidget" name="lstPorts">
-    <property name="geometry">
-     <rect>
-      <x>0</x>
-      <y>50</y>
-      <width>101</width>
-      <height>101</height>
-     </rect>
-    </property>
-   </widget>
-   <widget class="QPushButton" name="pbComRefresh">
-    <property name="geometry">
-     <rect>
-      <x>0</x>
-      <y>30</y>
-      <width>101</width>
-      <height>23</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>refresh ComPorts</string>
-    </property>
-   </widget>
    <widget class="QPushButton" name="pbTest">
     <property name="geometry">
      <rect>
-      <x>120</x>
-      <y>280</y>
+      <x>10</x>
+      <y>200</y>
       <width>75</width>
       <height>23</height>
      </rect>
@@ -53,7 +30,7 @@
    <widget class="QPushButton" name="pbTestWrite">
     <property name="geometry">
      <rect>
-      <x>220</x>
+      <x>170</x>
       <y>260</y>
       <width>75</width>
       <height>23</height>
@@ -66,7 +43,7 @@
    <widget class="QPushButton" name="pbTestRead">
     <property name="geometry">
      <rect>
-      <x>220</x>
+      <x>170</x>
       <y>280</y>
       <width>75</width>
       <height>23</height>
@@ -80,7 +57,7 @@
     <property name="geometry">
      <rect>
       <x>0</x>
-      <y>150</y>
+      <y>290</y>
       <width>81</width>
       <height>51</height>
      </rect>
@@ -93,7 +70,7 @@
     <property name="geometry">
      <rect>
       <x>10</x>
-      <y>330</y>
+      <y>380</y>
       <width>431</width>
       <height>111</height>
      </rect>
@@ -103,7 +80,7 @@
     <property name="geometry">
      <rect>
       <x>10</x>
-      <y>310</y>
+      <y>360</y>
       <width>101</width>
       <height>16</height>
      </rect>
@@ -115,8 +92,8 @@
    <widget class="QCheckBox" name="checkSendDmx">
     <property name="geometry">
      <rect>
-      <x>320</x>
-      <y>280</y>
+      <x>170</x>
+      <y>240</y>
       <width>70</width>
       <height>17</height>
      </rect>
@@ -129,8 +106,8 @@
     <property name="geometry">
      <rect>
       <x>10</x>
-      <y>440</y>
-      <width>431</width>
+      <y>490</y>
+      <width>341</width>
       <height>16</height>
      </rect>
     </property>
@@ -138,24 +115,251 @@
      <string>Dmx: </string>
     </property>
    </widget>
-   <widget class="ComBox" name="widget" native="true">
+   <widget class="ComBox" name="mycombox" native="true">
     <property name="geometry">
      <rect>
-      <x>100</x>
-      <y>30</y>
-      <width>171</width>
-      <height>201</height>
+      <x>0</x>
+      <y>10</y>
+      <width>151</width>
+      <height>131</height>
      </rect>
     </property>
    </widget>
-   <widget class="QListView" name="listDevices">
+   <widget class="QPushButton" name="pbKpngBroadcast">
     <property name="geometry">
      <rect>
-      <x>370</x>
-      <y>20</y>
-      <width>256</width>
-      <height>241</height>
+      <x>140</x>
+      <y>320</y>
+      <width>131</width>
+      <height>23</height>
      </rect>
+    </property>
+    <property name="text">
+     <string>KPNG broadcast</string>
+    </property>
+   </widget>
+   <widget class="QPushButton" name="pbKpngKnown">
+    <property name="geometry">
+     <rect>
+      <x>140</x>
+      <y>340</y>
+      <width>131</width>
+      <height>23</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>KPNG known devices</string>
+    </property>
+   </widget>
+   <widget class="QTableView" name="displayValues">
+    <property name="geometry">
+     <rect>
+      <x>570</x>
+      <y>40</y>
+      <width>291</width>
+      <height>481</height>
+     </rect>
+    </property>
+   </widget>
+   <widget class="QListWidget" name="listDevices">
+    <property name="geometry">
+     <rect>
+      <x>170</x>
+      <y>10</y>
+      <width>131</width>
+      <height>192</height>
+     </rect>
+    </property>
+   </widget>
+   <widget class="QPushButton" name="pbKBoot">
+    <property name="geometry">
+     <rect>
+      <x>320</x>
+      <y>150</y>
+      <width>75</width>
+      <height>23</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>kBoot</string>
+    </property>
+    <property name="checkable">
+     <bool>false</bool>
+    </property>
+    <property name="checked">
+     <bool>false</bool>
+    </property>
+    <property name="flat">
+     <bool>false</bool>
+    </property>
+   </widget>
+   <widget class="QGroupBox" name="groupBox">
+    <property name="geometry">
+     <rect>
+      <x>320</x>
+      <y>180</y>
+      <width>231</width>
+      <height>161</height>
+     </rect>
+    </property>
+    <property name="title">
+     <string>kBootloader</string>
+    </property>
+    <widget class="QPushButton" name="pbKbootLogout">
+     <property name="geometry">
+      <rect>
+       <x>10</x>
+       <y>20</y>
+       <width>75</width>
+       <height>23</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>Logout</string>
+     </property>
+    </widget>
+    <widget class="QPushButton" name="pbBootTest">
+     <property name="geometry">
+      <rect>
+       <x>10</x>
+       <y>100</y>
+       <width>75</width>
+       <height>23</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>BootTest</string>
+     </property>
+    </widget>
+    <widget class="QPushButton" name="pbBootChipReset">
+     <property name="geometry">
+      <rect>
+       <x>10</x>
+       <y>60</y>
+       <width>75</width>
+       <height>23</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>ChipReset</string>
+     </property>
+    </widget>
+    <widget class="QPushButton" name="pbBootLoadFlash">
+     <property name="geometry">
+      <rect>
+       <x>130</x>
+       <y>20</y>
+       <width>75</width>
+       <height>23</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>LoadHexFile</string>
+     </property>
+    </widget>
+    <widget class="QPushButton" name="pbBootFlashProgram">
+     <property name="geometry">
+      <rect>
+       <x>130</x>
+       <y>70</y>
+       <width>75</width>
+       <height>23</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>Program</string>
+     </property>
+    </widget>
+    <widget class="QProgressBar" name="pbarKBoot">
+     <property name="geometry">
+      <rect>
+       <x>20</x>
+       <y>130</y>
+       <width>201</width>
+       <height>23</height>
+      </rect>
+     </property>
+     <property name="value">
+      <number>0</number>
+     </property>
+    </widget>
+    <widget class="QPushButton" name="pbBootRequestCrc">
+     <property name="geometry">
+      <rect>
+       <x>130</x>
+       <y>100</y>
+       <width>75</width>
+       <height>23</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>request CRC</string>
+     </property>
+    </widget>
+    <widget class="QLabel" name="labelLoadCrc">
+     <property name="geometry">
+      <rect>
+       <x>130</x>
+       <y>40</y>
+       <width>81</width>
+       <height>16</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>???</string>
+     </property>
+    </widget>
+    <widget class="QLabel" name="labelProgCrc">
+     <property name="geometry">
+      <rect>
+       <x>130</x>
+       <y>50</y>
+       <width>81</width>
+       <height>16</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>???</string>
+     </property>
+    </widget>
+   </widget>
+   <widget class="QCheckBox" name="shkComHex">
+    <property name="geometry">
+     <rect>
+      <x>360</x>
+      <y>490</y>
+      <width>81</width>
+      <height>17</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>com as hex</string>
+    </property>
+   </widget>
+   <widget class="QCheckBox" name="chkKgetTimer">
+    <property name="geometry">
+     <rect>
+      <x>650</x>
+      <y>10</y>
+      <width>70</width>
+      <height>17</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>KGet timer</string>
+    </property>
+   </widget>
+   <widget class="QCheckBox" name="chkAutoFirmware">
+    <property name="geometry">
+     <rect>
+      <x>420</x>
+      <y>160</y>
+      <width>101</width>
+      <height>21</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>auto firmware</string>
     </property>
    </widget>
   </widget>
@@ -164,7 +368,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>629</width>
+     <width>878</width>
      <height>21</height>
     </rect>
    </property>

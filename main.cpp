@@ -21,20 +21,17 @@ int main(int argc, char *argv[])
     QCoreApplication::setOrganizationName("Chaos Company & Co");
     QCoreApplication::setApplicationName("kTerm");
     XBeeGui w;
-    qDebug("UsingRegistry now");
-    w.RefreshPorts();
-    qDebug() << ("show now");
+    qDebug() << "main(): show XBeeGui now";
     w.show();
-    qDebug("test now");
+    //qDebug("test now");
     //test();
     //test2();
-    qDebug("execute now");
+    qDebug() << "main(): execute application now";
     ret=a.exec();
-    qDebug("returning now");
+    qDebug() << "main(): returning now";
     return ret;
 }
-
-#include "CComPort.h"
+/*
 #include "CXBee.h"
 
 #include <qDateTime>
@@ -46,7 +43,7 @@ using namespace std;
 
 #define InBufSize 128
 
-/*void test2(void){
+void test2(void){
 SerialPortInfo iPort;
     // Example use SerialPortInfo
     foreach (const SerialPortInfo &info, SerialPortInfo::availablePorts()) {
@@ -67,7 +64,7 @@ SerialPortInfo iPort;
         s.close();
     }
     qDebug() << s.bytesToWrite();
-}*/
+}
 
 void test(void)
 {
@@ -150,5 +147,5 @@ void test(void)
 
     qDebug() << "!!!Hello World!!!" << endl; // prints !!!Hello World!!!
 
-}
+}*/
 
