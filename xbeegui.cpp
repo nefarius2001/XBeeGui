@@ -11,13 +11,19 @@
 //#include "serialport.h"
 #include <combox.h>
 
+#define SENDKDMX_NUMBEROFVALUES 40
 #define Byte3(xxx) ((xxx >>(8*3)) & 0xFF)
 #define Byte2(xxx) ((xxx >>(8*2)) & 0xFF)
 #define Byte1(xxx) ((xxx >>(8*1)) & 0xFF)
 #define Byte0(xxx) ((xxx >>(8*0)) & 0xFF)
 
+#define TimestampFormat "hh:mm:ss.zzz"
+
+#define BOOTLOADER_MAINAPP_SIZE 0x00018000
+
 XBeeGui::~XBeeGui()
 {
+    delete remoteflash; remoteflash=0;
     qDebug("~XBeeGui");
     delete port;
     port=NULL;
@@ -29,9 +35,13 @@ XBeeGui::XBeeGui(QWidget *parent)
     QLibrary l;
     QString sPort;
     qDebug("XBeeGui");
+    int iFor;
 
         this->pMainstate=eMsNormal;
         this->myflash=0;
+        //this->remoteflash=new Flashbuffer(0x08008000, (0x00040000-0x8000));
+        this->remoteflash=new Flashbuffer(0x08008000, BOOTLOADER_MAINAPP_SIZE);
+        qDebug()<< QString().sprintf("remoteflash empty CRC 0x%08X",remoteflash->GetCrc());
         mykboot.progress=0;
         mykboot.state=0;
         mykboot.kframe=0;
@@ -107,6 +117,11 @@ XBeeGui::XBeeGui(QWidget *parent)
             qDebug()<<"OpenXBeePort " << sPort;
             ui.mycombox->OpenCom(sPort);
         }
+
+        for(iFor=1;iFor<=15;iFor++){
+            this->knownList.append(QString().sprintf("%04X",iFor));
+        }
+        ui.displayAutoFirm->setVisible(false);
 }
 
 void XBeeGui::DiplayDisplayValues(){
@@ -154,13 +169,14 @@ void XBeeGui::ChangeMainstate(eeMainstate newState){
     ui.pbTestRead->setEnabled(bEnableNormal);
     ui.pbTestWrite->setEnabled(bEnableNormal);
 
-    ui.pbKBoot->setEnabled(bEnableNormal);
+    //ui.pbKBoot->setEnabled(bEnableNormal);
     ui.pbKbootLogout->setEnabled(bEnableBootloader);
     ui.pbBootChipReset->setEnabled(bEnableBootloader);
     ui.pbBootFlashProgram->setEnabled(bEnableBootloader);
     ui.pbBootLoadFlash->setEnabled(bEnableBootloader);
     //ui.pbBootRequestCrc->setEnabled(bEnableBootloader);
     ui.pbBootTest->setEnabled(bEnableBootloader);
+
 }
 
 void XBeeGui::handleXbeeTx(QByteArray packet){
@@ -229,7 +245,6 @@ void XBeeGui::handleXBeeRx(QByteArray packet){
         data=data.mid(2);
         sCmd=data.left(4);
 
-
         (void) kFrame;
         (void) data;
         (void) sCmd;
@@ -237,8 +252,10 @@ void XBeeGui::handleXBeeRx(QByteArray packet){
         if(sCmd.compare("xBOO")==0){
             myXbee.kFrameState[mykboot.kframe]=CXBee::eKFS_Fail;
             PacketKnown=1;
+            //qDebug() << "[BOOT] " << QTime().currentTime().toString(TimestampFormat) << "xBoo";
         }else if(sCmd.compare("kBOO")==0){
             myXbee.kFrameState[mykboot.kframe]=CXBee::eKFS_Success;
+            //qDebug() << "[BOOT] " << QTime().currentTime().toString(TimestampFormat) << "kBoo";
             switch(data.at(5)){
             case 'C':
                 tmpu32=*((quint32*)data.mid(6,4).constData());
@@ -329,6 +346,8 @@ void XBeeGui::handleXBeeRx(QByteArray packet){
     case xApiTransmitStatus:
         data=packet.mid(1);
         //qDebug() << "xApiTransmitStatus" << data.toHex() ;
+        //qDebug() << QTime().currentTime().toString("hh:mm:ss.zzz") << "xApiTransmitStatus";
+        testInt=1;
         break;
     default:
         qDebug() << "FORGOTTEN XBEE-ApiIdentifier";
@@ -336,9 +355,10 @@ void XBeeGui::handleXBeeRx(QByteArray packet){
     }
 }
 long iTimer=0;
+long iKbootTimeout=0;
 long iDmxTx=0;
 void XBeeGui::handleT1(){
-    QString s,st;
+    QString s;
     iTimer++;
 
 #if 0
@@ -366,9 +386,11 @@ void XBeeGui::handleT1(){
         this->ui.labelComRx->setText(s);
     }
 #endif
+
+    // DMX send
     if((iTimer%20==0)&&(ui.checkSendDmx->isChecked())){
         if(pDmxData){
-            myXbee.XBeeSend_KDMX(pDmxData,40);
+            myXbee.XBeeSend_KDMX(pDmxData,SENDKDMX_NUMBEROFVALUES);
             ui.labelDmxValues->setText(QString("Dmx: ").append( QByteArray((char*)pDmxData,10).toHex()));
             iDmxTx++;
             //uint8_t tmp;
@@ -377,18 +399,59 @@ void XBeeGui::handleT1(){
         }
         //myXbee.Test();
     }
+
+    // send
+    const int DbgRx_framerate=10;
+    if((iTimer%(1000/DbgRx_framerate)==0)&&(ui.checkSendDbgRx->isChecked())){
+        static int DbgRx_frame=0;
+        static char DbgRx_msg[14]="xxKDBR";
+        DbgRx_frame++;
+        DbgRx_msg[0]='x';
+        DbgRx_msg[1]='x';
+        DbgRx_msg[2]='K';
+        DbgRx_msg[3]='D';
+        DbgRx_msg[4]='B';
+        DbgRx_msg[5]='R';
+        DbgRx_msg[6]=(DbgRx_framerate>>(3*8))&0xFF;
+        DbgRx_msg[7]=(DbgRx_framerate>>(2*8))&0xFF;
+        DbgRx_msg[8]=(DbgRx_framerate>>(1*8))&0xFF;
+        DbgRx_msg[9]=(DbgRx_framerate>>(0*8))&0xFF;
+        DbgRx_msg[10]=(DbgRx_frame>>(3*8))&0xFF;
+        DbgRx_msg[11]=(DbgRx_frame>>(2*8))&0xFF;
+        DbgRx_msg[12]=(DbgRx_frame>>(1*8))&0xFF;
+        DbgRx_msg[13]=(DbgRx_frame>>(0*8))&0xFF;
+        myXbee.XBeeSendPacket16(0xFFFF,(uint8_t*)DbgRx_msg,sizeof(DbgRx_msg),0,0,1);
+        //myXbee.XBeeSend_KDMX()
+    }
+
+
+
     if(mykboot.state){
         if(myXbee.kFrameState[mykboot.kframe]!=CXBee::eKFS_Used){
+            qDebug() << "[BOOT] " << QTime().currentTime().toString(TimestampFormat) << " SendFlashProgramPacket x";
             SendFlashProgramPacket();
+            qDebug() << "[BOOT] " << QTime().currentTime().toString(TimestampFormat) << " done";
+        }else{
+            iKbootTimeout++;
+            if(iKbootTimeout>200){
+                qDebug() << "[BOOT] " << QTime().currentTime().toString(TimestampFormat) << " resend lastSentPackage";
+                this->myXbee.XBeeSendKcmd(mykboot.xbeeaddr,mykboot.lastSentPackage);
+                qDebug() << "[BOOT] " << QTime().currentTime().toString(TimestampFormat) << " done";
+                iKbootTimeout=0;
+            }
         }
         if((iTimer%5==0)&&(mykboot.state==eFPS_LogInNecessary)){
+            qDebug() << "[BOOT] " << QTime().currentTime().toString(TimestampFormat) << " SendFlashProgramPacket";
             SendFlashProgramPacket();
+            qDebug() << "[BOOT] " << QTime().currentTime().toString(TimestampFormat) << " done";
         }
     }
 }
 void XBeeGui::handleT2(){
     QString s;
-    s.sprintf("%5li Hz Rx-Timer\n%5li Hz Tx-Dmx", iTimer, iDmxTx);
+    s.sprintf("%5li Hz Rx-Timer\n%5li Hz Tx-Dmx\n%5li Hz Rx-Xbee\n%5li Hz Tx-XBee", iTimer, iDmxTx, this->myXbee.cntRxPackets , this->myXbee.cntTxPackets);
+    this->myXbee.cntRxPackets=0;
+    this->myXbee.cntTxPackets=0;
     this->ui.labelComTx->setText(s);
     iTimer=0;
     iDmxTx=0;
@@ -410,7 +473,7 @@ void XBeeGui::handlePbTestRead(){
         qDebug() << "handlePbTestRead ";
 
         uint8_t rec[150];
-        DWORD i;
+        unsigned long i;
         unsigned int k;
 
         if(this->port->isOpen()){
@@ -441,16 +504,56 @@ void XBeeGui::on_pbKpngKnown_clicked()
     }
 }
 
+void XBeeGui::UpdateVersionList(){
+    int iFor;
+    QString sDeviceKey;
+    int iDevice;
+    QList <QString> keyList=this->kDevices.keys();
+    kDevice* cDevice;
+
+    ui.displayAutoFirm->clear();
+    for(iFor=0;iFor<this->kDevices.size();iFor++){
+        sDeviceKey=keyList.value(iFor);
+        cDevice=this->kDevices.value(sDeviceKey);
+
+        int tmpH,tmpL;
+        QString tmpSWID=cDevice->values.value("SWID","????").toString();
+        QByteArray tmpSWV=cDevice->values.value("SWV_","\0k\0k").toByteArray();
+        tmpH=tmpSWV.mid(0,2).toHex().toUInt(0,16);
+        tmpL=tmpSWV.mid(2,2).toHex().toUInt(0,16);
+        QString tmpVer=QString().sprintf("%02x.%02x",tmpH,tmpL);
+        ui.displayAutoFirm->addItem(sDeviceKey + " - " + QString().sprintf("0x%08X",cDevice->flashcrc32) + " - " + tmpSWID + " - " + tmpVer) ;
+    }
+    ui.displayAutoFirm->addItem("zz " + QTime().currentTime().toString());
+    ui.displayAutoFirm->sortItems();
+}
+
 void XBeeGui::handleT3(){
     int iFor;
+
+    //Auto-Check-Firmware
     if((this->GetMainState()==eMsNormal)&&(ui.chkAutoFirmware->isChecked()) && (myflash!=NULL) && (ui.checkSendDmx->isChecked()==false)){
         QString sDeviceKey;
         int iDevice;
         QList <QString> keyList=this->kDevices.keys();
         kDevice* cDevice;
-        static int iDeviceShift=-1; // will be zero after increment
+        static int iDeviceShift=-1; // will be zero after first increment
         iDeviceShift++;
-        if(iDeviceShift>=this->kDevices.size()) iDeviceShift=0;
+        if(iDeviceShift<(this->kDevices.size() + 0)){
+            //just do that device [0 to size-1]
+        }else if(iDeviceShift<(this->kDevices.size() + this->knownList.count())){
+            //send a ping to known list [0 to size-1]
+            int tmp=iDeviceShift-this->kDevices.size();
+            if(tmp<0) tmp=0;
+            if(tmp>(this->knownList.count()-1)) tmp=0;
+            //this->myXbee.XBeeSendPing16(knownList.value(tmp).toUInt(0,16));
+            this->myXbee.XBeeSendKcmd(knownList.value(tmp).toUInt(0,16),QByteArray("KBOOTC"));
+            return;
+        }else{
+            iDeviceShift=0;
+
+            UpdateVersionList();
+        }
         for(iFor=0;iFor<this->kDevices.size();iFor++){
             iDevice=(iFor+iDeviceShift)%this->kDevices.size();
             sDeviceKey=keyList.value(iDevice);
@@ -487,6 +590,8 @@ void XBeeGui::handleT3(){
             }
         }
     }
+
+    //Auto-Update DIP
     if(ui.chkKgetTimer->isChecked()){
         uint16_t iXBeeID=GetSelectedXBeeAddr_uint16();
         if(iXBeeID==0){
@@ -538,6 +643,7 @@ void XBeeGui::on_pbKBoot_clicked()
     }
     uint16_t iAddr=GetSelectedXBeeAddr_uint16();
     this->myXbee.XBeeSendKcmd(iAddr,"KBOOT1");
+    ui.checkSendDmx->setChecked(false);
 }
 
 void XBeeGui::on_pbKbootLogout_clicked()
@@ -577,7 +683,21 @@ void XBeeGui::on_pbBootTest_clicked()
 
 void XBeeGui::on_pbTest_clicked()
 {
-    qDebug() << "no tests at the moment";
+    int iFor;
+    //qDebug() << "no tests at the moment";
+    uint8_t data[]={'x','x','K','P','N','G'};
+    QTime timestart;
+    timestart.start();
+    for(iFor=0;iFor<1000;iFor++){
+        testInt=0;
+        this->myXbee.XBeeSendPacket16(9,data,sizeof(data),0,0,0);
+        qDebug() << QTime().currentTime().toString("hh:mm:ss.zzz") << "send";
+        while(testInt==0){
+            QCoreApplication::processEvents();
+        }
+    }
+    //QTime timetest=QTime().currentTime().-timestart;
+    qDebug() << timestart.elapsed();
 }
 
 void XBeeGui::on_pbBootChipReset_clicked()
@@ -605,8 +725,7 @@ void XBeeGui::loadFlashHex(){
     }
 
 
-    Flashbuffer*x=new Flashbuffer(0x08008000,
-                  0x00018000);
+    Flashbuffer*x=new Flashbuffer(0x08008000, BOOTLOADER_MAINAPP_SIZE);
 
     qDebug() << "getOpenFileName open";
     sFile=QFileDialog::getOpenFileName(this,tr("Open Hex File"),sFile,"Intel Hex Files(*.hex)");
@@ -632,10 +751,58 @@ void XBeeGui::loadFlashHex(){
         ui.labelLoadCrc->setText(QString().sprintf("0x%08X",myflash->GetCrc()));
     }
 }
+void XBeeGui::loadFlashHex(QString sFile){
+
+    //QString sFile="E:/Test/FloKugel_V3_03.hex";
+    //QString sFile="E:/Allwork/Programmieren/Mikrocontroller/STM32/FloKugel/TrueProject/Debug/FloKugel_V3_03.elf.hex";
+    //QString sFile="E:/Allwork/Programmieren/Mikrocontroller/STM32/FloKugel/bin_archiv/FloKugel_V3_03.elf.hex";
+    int i;
+
+    if(myflash!=NULL){
+        delete myflash;
+        myflash=NULL;
+    }
+
+
+    Flashbuffer*x=new Flashbuffer(0x08008000,BOOTLOADER_MAINAPP_SIZE);
+
+    QFile f1(sFile);
+    if(!f1.exists()){
+        qDebug() << "getOpenFileName open";
+        sFile=QFileDialog::getOpenFileName(this,tr("Open Hex File"),sFile,"Intel Hex Files(*.hex)");
+        qDebug() << "getOpenFileName done";
+        if(sFile.isEmpty())return;
+    }
+
+    QFile f(sFile);
+    if(!f.exists()){
+        qDebug() << "ffffile does not exist "<<sFile;
+        return ;
+    }
+
+    i=x->readIntelHex(sFile);
+    qDebug() << "readIntelHex returned "<<i;
+    /*qDebug() << "\n\n\n\n\n\n\n\n\n";
+    unsigned int u;
+    for(u=0;u<x->size;u+=16){
+        qDebug() << QString().sprintf("0x%08X: ",u+x->offset) << x->buffer.mid(u,16).toHex();
+    }*/
+
+    if(i==0){
+        myflash=x;
+        ui.labelLoadCrc->setText(QString().sprintf("0x%08X",myflash->GetCrc()));
+    }
+}
 
 void XBeeGui::on_pbBootLoadFlash_clicked()
 {
     this->loadFlashHex();
+}
+void XBeeGui::on_pbBootLoadFlashDevelop_clicked()
+{
+    //this->loadFlashHex("E:/Allwork/Programmieren/Mikrocontroller/STM32/FloKugel/TrueProject/Debug/FloKugel_V3_03.elf.hex");
+    this->loadFlashHex("E:/Allwork/Programmieren/Mikrocontroller/STM32/FloKugel/CooProject/FloKugel/Debug/bin/FloKugel_V3_03.elf.hex");
+
 }
 
 void XBeeGui::on_pbBootFlashProgram_clicked()
@@ -654,7 +821,7 @@ void XBeeGui::on_pbBootFlashProgram_clicked()
     mykboot.state=eFPS_FlashReset;
     mykboot.retries=0;
     ui.pbarKBoot->setMaximum(myflash->size);
-    this->SendFlashProgramPacket();
+    //this->SendFlashProgramPacket();
 }
 
 #define KFLASHPACKETSIZE 64
@@ -664,32 +831,43 @@ void XBeeGui::SendFlashProgramPacket(){
     quint32 flashaddr=0;
     quint32 bufferaddr=0;
     //int k;
-    qDebug() << "SendFlashProgramPacket(" << ('0'+mykboot.state) << ")";
+    //qDebug() << "SendFlashProgramPacket(" << mykboot.state << ")";
     switch(mykboot.state){
     case eFPS_LogInNecessary:
-        this->myXbee.XBeeSendKcmd(mykboot.xbeeaddr,QByteArray("KBOOT1"));
+        mykboot.lastSentPackage=QByteArray("KBOOT1");
+        this->myXbee.XBeeSendKcmd(mykboot.xbeeaddr,mykboot.lastSentPackage);
+        iKbootTimeout=0;
         mykboot.state=eFPS_LogInNecessary;
         break;
     case eFPS_FlashReset:
-        this->myXbee.XBeeSendKcmd(mykboot.xbeeaddr,QByteArray("KBOOTR"));
-        mykboot.state=eFPS_Flash;
+        qDebug() << "send flash reset";
+        mykboot.lastSentPackage=QByteArray("KBOOTR");
+        mykboot.kframe=this->myXbee.XBeeSendKcmd(mykboot.xbeeaddr,mykboot.lastSentPackage);
+        iKbootTimeout=0;
+        delete this->remoteflash;
+        this->remoteflash=new Flashbuffer(0x08008000, BOOTLOADER_MAINAPP_SIZE);
+        mykboot.state=eFPS_FlashCRC_request;//eFPS_Flash;
         break;
     case eFPS_Flash:
-        mykboot.progress+=KFLASHPACKETSIZE;
-        if(mykboot.progress>myflash->size){
-            mykboot.state=eFPS_FlashComplete;
-            return;
-        }
-        bufferaddr=myflash->size - mykboot.progress;
-        flashaddr=myflash->offset + bufferaddr;
+        while(1){
+            mykboot.progress+=KFLASHPACKETSIZE;
+            if(mykboot.progress>myflash->size){
+                mykboot.state=eFPS_FlashComplete;
+                return;
+            }
+            bufferaddr=myflash->size - mykboot.progress;
+            flashaddr=myflash->offset + bufferaddr;
 
-        tmpdata=myflash->buffer.mid(bufferaddr,KFLASHPACKETSIZE);
-        if(QString(tmpdata.toHex()).compare("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",Qt::CaseInsensitive)==0){
-            // only 0xFF
-            qDebug() << QString().sprintf("flash    skip 0x%08X: ",flashaddr) << tmpdata.toHex();
-            return;
+            tmpdata=myflash->buffer.mid(bufferaddr,KFLASHPACKETSIZE);
+            if(QString(tmpdata.toHex()).compare("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",Qt::CaseInsensitive)==0){
+                // only 0xFF
+                //qDebug() << QString().sprintf("flash    skip 0x%08X: ",flashaddr) << tmpdata.toHex();
+                //return;
+            }else{
+                break;
+            }
         }
-        qDebug() << QString().sprintf("flash program 0x%08X: ",flashaddr) << tmpdata.toHex();
+        qDebug() << QString().sprintf("flash program 0x%08X: '%s'",flashaddr,tmpdata.toHex().constData());
         d.clear();
         d.append("KBOOTF");
         d.append(Byte0(flashaddr));
@@ -697,20 +875,65 @@ void XBeeGui::SendFlashProgramPacket(){
         d.append(Byte2(flashaddr));
         d.append(Byte3(flashaddr));
         d.append(tmpdata);
-        mykboot.kframe=this->myXbee.XBeeSendKcmd(mykboot.xbeeaddr,d);
+        mykboot.lastSentPackage=d;
+        mykboot.kframe=this->myXbee.XBeeSendKcmd(mykboot.xbeeaddr,mykboot.lastSentPackage);
+        iKbootTimeout=0;
+        remoteflash->buffer.replace(bufferaddr,KFLASHPACKETSIZE,tmpdata);
+        if((bufferaddr%0x400)==0){
+            mykboot.state=eFPS_FlashCRC_request;
+        }
         break;
+    case eFPS_FlashCRC_request:
+        mykboot.state=eFPS_FlashCRC_compare;
+        qDebug() << "flash crc intermediate";
+        mykboot.receivedFlashCRC++;
+        mykboot.lastSentPackage=QByteArray("KBOOTC");
+        this->myXbee.XBeeSendKcmd(mykboot.xbeeaddr,mykboot.lastSentPackage);
+        iKbootTimeout=0;
+        break;
+    case eFPS_FlashCRC_compare:
+        if(((quint32)mykboot.receivedFlashCRC)==this->remoteflash->GetCrc()){
+            qDebug() << "intermediate CRC match";
+            mykboot.state=eFPS_Flash;
+            return;
+        }else{
+            qDebug() <<  QString().sprintf("crc mismatch: pc: 0x%08X" , remoteflash->GetCrc());
+            qDebug() <<  QString().sprintf("crc mismatch: mC: 0x%08X" , mykboot.receivedFlashCRC);
+            qDebug() << "quick and dirty QnD handling for intermediate CRC mismatch yet";
+            if(mykboot.retries<2){
+                //retry
+                mykboot.retries++;
+                qDebug() << "flash retry nr. " << mykboot.retries;
+                mykboot.progress=0;
+                mykboot.state=eFPS_FlashReset;
+            }else{
+                //give up
+                qDebug() << "flash surrender";
+                mykboot.state=eFPS_None;
+            }
+            return;
+        }
+        break;
+
     case eFPS_FlashComplete:
-        mykboot.state=eFPS_FlashCRC;
-        qDebug() << "flash crc";
-        this->myXbee.XBeeSendKcmd(mykboot.xbeeaddr,QByteArray("KBOOTC"));
+        mykboot.state=eFPS_FinalCRC;
+        qDebug() << "flash crc final";
+        mykboot.lastSentPackage=QByteArray("KBOOTC");
+        this->myXbee.XBeeSendKcmd(mykboot.xbeeaddr,mykboot.lastSentPackage);
+        iKbootTimeout=0;
         break;
-    case eFPS_FlashCRC:
+    case eFPS_FinalCRC:
         if(((quint32)mykboot.receivedFlashCRC)==this->myflash->GetCrc()){
             qDebug() << "flash success";
             mykboot.state=eFPS_None;
             if(this->GetMainState()==eMsAutoFlash){
-                this->myXbee.XBeeSendKcmd(mykboot.xbeeaddr,QByteArray("KBOOT0"));
+                mykboot.lastSentPackage=QByteArray("KBOOT0");
+                this->myXbee.XBeeSendKcmd(mykboot.xbeeaddr,mykboot.lastSentPackage);
+                iKbootTimeout=0;
                 this->ChangeMainstate(eMsNormal);
+            }
+            if(ui.chkLogoutAfterProgram->checkState()==Qt::Checked){
+                on_pbKbootLogout_clicked();
             }
         }else{
             qDebug() <<  QString().sprintf("crc mismatch: pc: 0x%08X" , myflash->GetCrc());
@@ -767,14 +990,93 @@ void XBeeGui::on_chkAutoFirmware_stateChanged(int newstate)
 {
     switch(newstate){
     case Qt::Unchecked:
+
+        ui.displayValues->setVisible(true);
+        ui.displayAutoFirm->setVisible(false);
+
         qDebug() << "TODO";
         break;
     case Qt::Checked:
         this->loadFlashHex();
+
+        ui.displayValues->setVisible(false);
+        ui.displayAutoFirm->setVisible(true);
+
         qDebug() << "TODO";
         break;
     case Qt::PartiallyChecked:
         qDebug() << "ShouldNeverHappen";
         break;
     }
+}
+
+void XBeeGui::on_pbDmxW_clicked()
+{
+    int k;
+    for(k=0;k<(SENDKDMX_NUMBEROFVALUES-4);k+=5){
+        pDmxData[k+0]=0xFF;
+        pDmxData[k+1]=0xFF;
+        pDmxData[k+2]=0xFF;
+        pDmxData[k+3]=0xFF;
+        pDmxData[k+4]=0;
+    }
+}
+
+void XBeeGui::on_pbDmxR_clicked()
+{
+    int k;
+    for(k=0;k<(SENDKDMX_NUMBEROFVALUES-4);k+=5){
+        pDmxData[k+0]=0xFF;
+        pDmxData[k+1]=0x00;
+        pDmxData[k+2]=0x00;
+        pDmxData[k+3]=0xFF;
+        pDmxData[k+4]=0;
+    }
+}
+
+void XBeeGui::on_pbDmxG_clicked()
+{
+    int k;
+    for(k=0;k<(SENDKDMX_NUMBEROFVALUES-4);k+=5){
+        pDmxData[k+0]=0x00;
+        pDmxData[k+1]=0xFF;
+        pDmxData[k+2]=0x00;
+        pDmxData[k+3]=0xFF;
+        pDmxData[k+4]=0;
+    }
+}
+
+void XBeeGui::on_pbDmxB_clicked()
+{
+    int k;
+    for(k=0;k<(SENDKDMX_NUMBEROFVALUES-4);k+=5){
+        pDmxData[k+0]=0x00;
+        pDmxData[k+1]=0x00;
+        pDmxData[k+2]=0xFF;
+        pDmxData[k+3]=0xFF;
+        pDmxData[k+4]=0;
+    }
+}
+
+void XBeeGui::on_pbDmxX_clicked()
+{
+    int k;
+    for(k=0;k<(SENDKDMX_NUMBEROFVALUES-4);k+=5){
+        pDmxData[k+0]=0;
+        pDmxData[k+1]=0;
+        pDmxData[k+2]=0;
+        pDmxData[k+3]=0;
+        pDmxData[k+4]=0;
+    }
+}
+
+void XBeeGui::on_lineKSEND_returnPressed()
+{
+    if(GetSelectedXBeeAddr_uint16()==0){
+        qDebug() << "no device selected";
+        return;
+    }
+    uint16_t iAddr=GetSelectedXBeeAddr_uint16();
+    this->myXbee.XBeeSendKcmd(iAddr,this->ui.lineKSEND->text().toLatin1());
+    ui.checkSendDmx->setChecked(false);
 }

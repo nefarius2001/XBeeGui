@@ -7,7 +7,7 @@ Flashbuffer::Flashbuffer(int iOffset, int iSize)
     this->offset=iOffset;
     this->size=iSize;
     this->buffer=QByteArray(iSize,0xFF);
-    qDebug() << "emptycrc = " << QString().sprintf("0x%08X",GetCrc());
+    qDebug() << "creating flashbuffer, emptycrc = " << QString().sprintf("0x%08X",GetCrc());
 }
 uint32_t Flashbuffer::Crc32(uint32_t Crc, uint32_t Data)
 {
@@ -133,6 +133,11 @@ int Flashbuffer::readIntelHex(QString sFile){
                         ||(flashaddr+LineLen)>(offset+size))
                 {
                     qDebug() << "data out of range ("<<flashaddr<<"-"<<(flashaddr+LineLen)<<" vs "<<offset<<"-"<<(offset+size)<<")";
+                    qDebug() << QString().sprintf("data out of range (0x%lX-0x%lX vs 0x%lX-0x%lX)",
+                                                  (long unsigned int)flashaddr,
+                                                  (long unsigned int)(flashaddr+LineLen),
+                                                  (long unsigned int)offset,
+                                                  (long unsigned int)(offset+size));
                     ret=-11;
                     break;
                 }

@@ -28,13 +28,16 @@ public:
     QTimer t1;
     QTimer t2;
     QTimer t3;
+    int testInt;
     QLibrary * libKDmxBridge;
     DmxGetOutPointer_t DmxGetOutPointer;
     BYTE *pDmxData;
     //QextSerialPort *port;
     QSerialPort *port;
     QMap<QString,kDevice*> kDevices;
+    QList <QString> knownList;
     Flashbuffer* myflash;
+    Flashbuffer* remoteflash;
     void SendFlashProgramPacket();
     enum eeFlashProgrammingStates{
         eFPS_None=0,
@@ -43,15 +46,18 @@ public:
         eFPS_FlashReset,
         eFPS_Flash,
         eFPS_FlashComplete,
-        eFPS_FlashCRC
+        eFPS_FlashCRC_request,
+        eFPS_FlashCRC_compare,
+        eFPS_FinalCRC
     };
     struct mykboot_t{
         qint32       progress;
-        char         state;
+        int          state;
         uint16_t     kframe;
         uint16_t     xbeeaddr;
         int          retries;
         qint32       receivedFlashCRC;
+        QByteArray   lastSentPackage;
     }mykboot;
     quint16 GetSelectedXBeeAddr_uint16();
     QString GetSelectedXBeeAddr_string();
@@ -64,7 +70,9 @@ public:
     void ChangeMainstate(eeMainstate newState);
     eeMainstate GetMainState(void);
     void loadFlashHex();
+    void loadFlashHex(QString);
     void DiplayDisplayValues();
+    void UpdateVersionList();
 private:
     eeMainstate pMainstate;
 private slots:
@@ -84,16 +92,18 @@ private slots:
     void on_pbKbootLogout_clicked();
     void on_pbBootTest_clicked();
     void on_pbTest_clicked();
-
     void on_pbBootChipReset_clicked();
-
     void on_pbBootLoadFlash_clicked();
-
     void on_pbBootFlashProgram_clicked();
-
     void on_pbBootRequestCrc_clicked();
-
     void on_chkAutoFirmware_stateChanged(int newstate);
+    void on_pbDmxW_clicked();
+    void on_pbDmxR_clicked();
+    void on_pbDmxG_clicked();
+    void on_pbDmxB_clicked();
+    void on_pbDmxX_clicked();
+    void on_pbBootLoadFlashDevelop_clicked();
+    void on_lineKSEND_returnPressed();
 
 private:
     Ui::XBeeGuiClass ui;

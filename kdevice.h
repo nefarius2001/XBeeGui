@@ -9,6 +9,7 @@ class kDevice
 {
 public:
     kDevice();
+    kDevice(uint16_t addr16_new);
     QMap<QString,QVariant> values;
     QMap<QString,QTime>    valueReceiveTimes;
     QTime lastreceived;

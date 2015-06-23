@@ -1,5 +1,5 @@
-
-#define BYTE unsigned char
+#include <stdint.h>
+#define BYTE uint8_t
 
 typedef  BYTE   (*DmxGetOut_t)(BYTE index);
 typedef  BYTE * (*DmxGetOutPointer_t)(void);
