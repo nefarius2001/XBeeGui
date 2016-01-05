@@ -73,8 +73,11 @@ public:
     void loadFlashHex(QString);
     void DiplayDisplayValues();
     void UpdateVersionList();
+    bool bLogToFile;
+    QFile* logfile;
 private:
     eeMainstate pMainstate;
+    void PacketForLogfile(QByteArray packet);
 private slots:
     void handleT1();
     void handleT2();
@@ -104,6 +107,8 @@ private slots:
     void on_pbDmxX_clicked();
     void on_pbBootLoadFlashDevelop_clicked();
     void on_lineKSEND_returnPressed();
+
+    void on_chkLogToFile_stateChanged(int arg1);
 
 private:
     Ui::XBeeGuiClass ui;

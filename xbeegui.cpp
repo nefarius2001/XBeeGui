@@ -42,6 +42,9 @@ XBeeGui::XBeeGui(QWidget *parent)
         //this->remoteflash=new Flashbuffer(0x08008000, (0x00040000-0x8000));
         this->remoteflash=new Flashbuffer(0x08008000, BOOTLOADER_MAINAPP_SIZE);
         qDebug()<< QString().sprintf("remoteflash empty CRC 0x%08X",remoteflash->GetCrc());
+        this->bLogToFile=false;
+        this->logfile=NULL;
+
         mykboot.progress=0;
         mykboot.state=0;
         mykboot.kframe=0;
@@ -188,6 +191,27 @@ void XBeeGui::handleXbeeTx(QByteArray packet){
         ui.textCom->append(s);
     }
 }
+void XBeeGui::PacketForLogfile(QByteArray packet){
+    if(this->bLogToFile){
+        QString sLogLine;
+        QString sTmp;
+
+        long k;
+        qDebug() << "PacketForLogfile";
+        sLogLine.append(QString().sprintf("%i;",QTime::currentTime().msecsSinceStartOfDay()));
+
+        qDebug() << "x=" << sLogLine;
+        for(k=0;k<packet.length();k++){
+                sTmp=QString().sprintf("%02X ",(quint8)packet.at(k));
+                //qDebug() << "sTmp=" << sTmp;
+                sLogLine.append(sTmp);
+        }
+        qDebug() << "sLogLine=" << sLogLine;
+        this->logfile->write(sLogLine.toLatin1().data(),sLogLine.length());
+        this->logfile->write("\n",1);
+        this->logfile->flush();
+    }
+}
 
 void XBeeGui::handleXBeeRx(QByteArray packet){
     QString s;
@@ -207,6 +231,7 @@ void XBeeGui::handleXBeeRx(QByteArray packet){
     }
 #endif
     ui.textCom->append(s);
+    this->PacketForLogfile(packet);
     //ui.textCom->insert
     const uint8_t *p=(const uint8_t *)packet.constData();
     switch(*p){
@@ -455,6 +480,7 @@ void XBeeGui::handleT2(){
     this->ui.labelComTx->setText(s);
     iTimer=0;
     iDmxTx=0;
+    this->PacketForLogfile(QString("FAKE").toLatin1());
 }
 
 
@@ -507,7 +533,7 @@ void XBeeGui::on_pbKpngKnown_clicked()
 void XBeeGui::UpdateVersionList(){
     int iFor;
     QString sDeviceKey;
-    int iDevice;
+    //int iDevice;
     QList <QString> keyList=this->kDevices.keys();
     kDevice* cDevice;
 
@@ -1079,4 +1105,36 @@ void XBeeGui::on_lineKSEND_returnPressed()
     uint16_t iAddr=GetSelectedXBeeAddr_uint16();
     this->myXbee.XBeeSendKcmd(iAddr,this->ui.lineKSEND->text().toLatin1());
     ui.checkSendDmx->setChecked(false);
+}
+
+void XBeeGui::on_chkLogToFile_stateChanged(int state)
+{
+    if(state==Qt::Checked){
+        QString logfilename;
+        logfilename.append("KajePilot_");
+        logfilename.append(QDateTime().currentDateTime().toString("yyyy-MM-dd_hh-mm-ss"));
+        logfilename.append(".txt");
+        qDebug() << logfilename;
+        qDebug() << logfilename.length();
+
+        QFile logfilepointerfile("E:/Data/Logs/KajePilot/KajePilot.txt");
+        qDebug() << "open";
+        logfilepointerfile.open(QIODevice::WriteOnly);
+        logfilepointerfile.write(logfilename.toLatin1().data(),logfilename.length());
+        logfilepointerfile.write("\n",1);
+        qDebug() << "flush";
+        logfilepointerfile.flush();
+        logfilepointerfile.close();
+
+        this->logfile = new QFile(QString("E:/Data/Logs/KajePilot/").append(logfilename));
+        this->logfile->open(QIODevice::WriteOnly);
+        this->logfile->write("ya bro\n",7);
+        this->logfile->flush();
+        this->bLogToFile=true;
+    }else{
+        this->logfile->close();
+        delete this->logfile;
+        this->logfile=NULL;
+        this->bLogToFile=false;
+    }
 }
