@@ -7,6 +7,7 @@
 #include <QFileDialog>
 #include <QtDebug>
 #include <QString>
+//#include <QMessageBox>
 #include <stdio.h>
 //#include "serialport.h"
 #include <combox.h>
@@ -71,43 +72,22 @@ XBeeGui::XBeeGui(QWidget *parent)
         this->t1.start(1);
         this->t2.start(1000);
         this->t3.start(100);
-        qDebug("Load kBridgeDll");
-        DmxGetOutPointer=0;
-        pDmxData=0;
-        QString sdll= QString("kBridgeDll");
-        //QString sdll=QString ( getenv("WINDIR") ) + "\\system32\\kBridgeDll.dll";
-        qDebug()<<sdll;
-        libKDmxBridge=new QLibrary(sdll);
 
-        if(libKDmxBridge->load()==false){
-            qDebug("kBridgeDll NOT loaded");
-        }else{
-            qDebug("kBridgeDll loaded");
-            DmxGetOutPointer = (DmxGetOutPointer_t) libKDmxBridge->resolve("DmxGetOutPointer");
-            if (DmxGetOutPointer){
-                qDebug("DmxGetOutPointer loaded");
-                pDmxData = DmxGetOutPointer();
-                QString s;
-                s.sprintf("pDmxData loaded(&%li)",(long)pDmxData);
-                qDebug() << s;
-            }else{
-                qWarning("DmxGetOutPointer not resolved");
-            }
-        }
 
         QStandardItemModel *model = new QStandardItemModel(4,2,this); //2 Rows and 3 Columns
         model->setHorizontalHeaderItem(0, new QStandardItem(QString("Property")));
         model->setHorizontalHeaderItem(1, new QStandardItem(QString("Value")));
         QStringList tmpslist;
         model->setItem(0,0,new QStandardItem("NAME")); tmpslist.append("Name");
-        model->setItem(1,0,new QStandardItem("FVCC")); tmpslist.append("U[mV]");
-        model->setItem(2,0,new QStandardItem("XXXX")); tmpslist.append("I[mA]");
-        model->setItem(3,0,new QStandardItem("Mode")); tmpslist.append("Mode");
-        model->setItem(4,0,new QStandardItem("DAdr")); tmpslist.append("DmxAddr");
-        model->setItem(5,0,new QStandardItem("KDMX")); tmpslist.append("DmxValue");
-        model->setItem(6,0,new QStandardItem("DIP_")); tmpslist.append("DIP");
-        model->setItem(7,0,new QStandardItem("SWID")); tmpslist.append("SWID");
-        model->setItem(8,0,new QStandardItem("SWV_")); tmpslist.append("SWV");
+        model->setItem(1,0,new QStandardItem("FVCC")); tmpslist.append("U[mV](F)");
+        model->setItem(2,0,new QStandardItem("VCC_")); tmpslist.append("U[mV](A)");
+        model->setItem(3,0,new QStandardItem("XXXX")); tmpslist.append("I[mA]");
+        model->setItem(4,0,new QStandardItem("Mode")); tmpslist.append("Mode");
+        model->setItem(5,0,new QStandardItem("DAdr")); tmpslist.append("DmxAddr");
+        model->setItem(6,0,new QStandardItem("KDMX")); tmpslist.append("DmxValue");
+        model->setItem(7,0,new QStandardItem("DIP_")); tmpslist.append("DIP");
+        model->setItem(8,0,new QStandardItem("SWID")); tmpslist.append("SWID");
+        model->setItem(9,0,new QStandardItem("SWV_")); tmpslist.append("SWV");
         model->setVerticalHeaderLabels(tmpslist);
         // NAME HW__ HWID HWV_ SW__ SWID SWV_  Mode Vmin AVol VCC_ FVCC
 
@@ -413,16 +393,12 @@ void XBeeGui::handleT1(){
 #endif
 
     // DMX send
-    if((iTimer%20==0)&&(ui.checkSendDmx->isChecked())){
-        if(pDmxData){
-            myXbee.XBeeSend_KDMX(pDmxData,SENDKDMX_NUMBEROFVALUES);
-            ui.labelDmxValues->setText(QString("Dmx: ").append( QByteArray((char*)pDmxData,10).toHex()));
+    if(iTimer%20==0){
+        ui.labelDmxValues->setText(QString("Dmx: ").append( QByteArray((char*)this->myDmxBridge.pDmxData,10).toHex()));
+        if(ui.checkSendDmx->isChecked()){
+            myXbee.XBeeSend_KDMX(this->myDmxBridge.pDmxData,SENDKDMX_NUMBEROFVALUES);
             iDmxTx++;
-            //uint8_t tmp;
-            //tmp=myXbee.XBeeSend_KDMX(pDmxData,40);
-            //qDebug() << "XBeeSend_KDMX " << tmp;
         }
-        //myXbee.Test();
     }
 
     // send
@@ -1036,65 +1012,47 @@ void XBeeGui::on_chkAutoFirmware_stateChanged(int newstate)
     }
 }
 
-void XBeeGui::on_pbDmxW_clicked()
+void XBeeGui::easySetRGB_ALL(uint8_t r,uint8_t g,uint8_t b,uint8_t l,uint8_t strobe)
 {
     int k;
     for(k=0;k<(SENDKDMX_NUMBEROFVALUES-4);k+=5){
-        pDmxData[k+0]=0xFF;
-        pDmxData[k+1]=0xFF;
-        pDmxData[k+2]=0xFF;
-        pDmxData[k+3]=0xFF;
-        pDmxData[k+4]=0;
+        this->myDmxBridge.pDmxData[k+0]=r;
+        this->myDmxBridge.pDmxData[k+1]=g;
+        this->myDmxBridge.pDmxData[k+2]=b;
+        this->myDmxBridge.pDmxData[k+3]=l;
+        this->myDmxBridge.pDmxData[k+4]=strobe;
     }
+}
+
+void XBeeGui::on_pbDmxW_clicked()
+{
+    this->easySetRGB_ALL(0xFF,0xFF,0xFF,0xFF,0x00);
 }
 
 void XBeeGui::on_pbDmxR_clicked()
 {
-    int k;
-    for(k=0;k<(SENDKDMX_NUMBEROFVALUES-4);k+=5){
-        pDmxData[k+0]=0xFF;
-        pDmxData[k+1]=0x00;
-        pDmxData[k+2]=0x00;
-        pDmxData[k+3]=0xFF;
-        pDmxData[k+4]=0;
-    }
+    this->easySetRGB_ALL(0xFF,0x00,0x00,0xFF,0x00);
 }
 
 void XBeeGui::on_pbDmxG_clicked()
 {
-    int k;
-    for(k=0;k<(SENDKDMX_NUMBEROFVALUES-4);k+=5){
-        pDmxData[k+0]=0x00;
-        pDmxData[k+1]=0xFF;
-        pDmxData[k+2]=0x00;
-        pDmxData[k+3]=0xFF;
-        pDmxData[k+4]=0;
-    }
+    this->easySetRGB_ALL(0x00,0xFF,0x00,0xFF,0x00);
 }
 
 void XBeeGui::on_pbDmxB_clicked()
 {
-    int k;
-    for(k=0;k<(SENDKDMX_NUMBEROFVALUES-4);k+=5){
-        pDmxData[k+0]=0x00;
-        pDmxData[k+1]=0x00;
-        pDmxData[k+2]=0xFF;
-        pDmxData[k+3]=0xFF;
-        pDmxData[k+4]=0;
-    }
+    this->easySetRGB_ALL(0x00,0x00,0xFF,0xFF,0x00);
 }
 
 void XBeeGui::on_pbDmxX_clicked()
 {
-    int k;
-    for(k=0;k<(SENDKDMX_NUMBEROFVALUES-4);k+=5){
-        pDmxData[k+0]=0;
-        pDmxData[k+1]=0;
-        pDmxData[k+2]=0;
-        pDmxData[k+3]=0;
-        pDmxData[k+4]=0;
-    }
+    this->easySetRGB_ALL(0x00,0x00,0x00,0x00,0x00);
 }
+void XBeeGui::on_pbDmxW10_clicked()
+{
+    this->easySetRGB_ALL(0xFF,0xFF,0xFF,0x10,0x00);
+}
+
 
 void XBeeGui::on_lineKSEND_returnPressed()
 {

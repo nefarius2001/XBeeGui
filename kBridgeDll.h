@@ -1,12 +1,25 @@
+#ifndef KBRIDGEDLL_H
+#define KBRIDGEDLL_H
+
 #include <stdint.h>
-#define BYTE uint8_t
+#include <QLibrary>
 
-typedef  BYTE   (*DmxGetOut_t)(BYTE index);
-typedef  BYTE * (*DmxGetOutPointer_t)(void);
-typedef  void   (*DmxSetOut_t)(BYTE index, BYTE value);
+typedef  uint8_t   (*DmxGetOut_t)(uint8_t index);
+typedef  uint8_t * (*DmxGetOutPointer_t)(void);
+typedef  void   (*DmxSetOut_t)(uint8_t index, uint8_t value);
 
-//BYTE __stdcall DmxGetOut(BYTE index);
-//BYTE * __stdcall DmxGetOutPointer(void);
-//void __stdcall DmxSetOut(BYTE index, BYTE value);
-//BYTE __stdcall DmxGetIn(BYTE index);
-//void __stdcall DmxSetIn(BYTE index, BYTE value);
+#define DmxDataFallback_NUMEL 512
+
+class KBridgeDll
+{
+public:
+
+    QLibrary * libKDmxBridge;
+    DmxGetOutPointer_t DmxGetOutPointer;
+    uint8_t *pDmxData;
+    uint8_t   DmxDataFallback[DmxDataFallback_NUMEL];
+
+    KBridgeDll();
+};
+
+#endif // KBRIDGEDLL_H

@@ -3,7 +3,6 @@
 
 #include <QMainWindow>
 #include <QTimer>
-#include <QLibrary>
 #include "ui_xbeegui.h"
 //#include "CComPort.h"
 #include "CXBee.h"
@@ -29,9 +28,7 @@ public:
     QTimer t2;
     QTimer t3;
     int testInt;
-    QLibrary * libKDmxBridge;
-    DmxGetOutPointer_t DmxGetOutPointer;
-    BYTE *pDmxData;
+    KBridgeDll myDmxBridge;
     //QextSerialPort *port;
     QSerialPort *port;
     QMap<QString,kDevice*> kDevices;
@@ -100,6 +97,7 @@ private slots:
     void on_pbBootFlashProgram_clicked();
     void on_pbBootRequestCrc_clicked();
     void on_chkAutoFirmware_stateChanged(int newstate);
+    void easySetRGB_ALL(uint8_t r,uint8_t g,uint8_t b,uint8_t l,uint8_t strobe);
     void on_pbDmxW_clicked();
     void on_pbDmxR_clicked();
     void on_pbDmxG_clicked();
@@ -109,6 +107,8 @@ private slots:
     void on_lineKSEND_returnPressed();
 
     void on_chkLogToFile_stateChanged(int arg1);
+
+    void on_pbDmxW10_clicked();
 
 private:
     Ui::XBeeGuiClass ui;

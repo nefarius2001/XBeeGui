@@ -22,13 +22,15 @@ greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 HEADERS += \
     xbeegui.h \
     kDmxBridge.h \
-    kBridgeDll.h \
     kdevice.h \
-    flashbuffer.h
+    flashbuffer.h \
+    kBridgeDll_Define.h \
+    kBridgeDll.h
 SOURCES += \
     main.cpp \
     xbeegui.cpp \
     kdevice.cpp \
-    flashbuffer.cpp
+    flashbuffer.cpp \
+    kBridgeDll.cpp
 FORMS += xbeegui.ui
 #RESOURCES +=

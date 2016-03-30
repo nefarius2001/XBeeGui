@@ -502,6 +502,19 @@
      <string>log to file</string>
     </property>
    </widget>
+   <widget class="QPushButton" name="pbDmxW10">
+    <property name="geometry">
+     <rect>
+      <x>460</x>
+      <y>360</y>
+      <width>75</width>
+      <height>23</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>White10%</string>
+    </property>
+   </widget>
   </widget>
   <widget class="QMenuBar" name="menubar">
    <property name="geometry">
